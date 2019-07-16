@@ -1200,12 +1200,14 @@ class HloCustomCallInstruction : public HloInstruction {
  public:
   HloCustomCallInstruction(const Shape& shape,
                            absl::Span<HloInstruction* const> operands,
+                           HloComputation* subcomputation,
                            absl::string_view custom_call_target, string opaque);
 
   // Constructor for a custom call with constrained layout. 'shape' and
   // 'operands_with_layout' must all have layouts.
   HloCustomCallInstruction(const Shape& shape,
                            absl::Span<HloInstruction* const> operands,
+                           HloComputation* subcomputation,
                            absl::string_view custom_call_target, string opaque,
                            absl::Span<const Shape> operand_shapes_with_layout);
 

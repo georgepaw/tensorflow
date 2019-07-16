@@ -2124,7 +2124,8 @@ HloSelectAndScatterInstruction::CloneWithNewOperandsImpl(
 
 HloCustomCallInstruction::HloCustomCallInstruction(
     const Shape& shape, absl::Span<HloInstruction* const> operands,
-    absl::string_view custom_call_target, string opaque)
+    HloComputation* subcomputation, absl::string_view custom_call_target,
+    string opaque)
     : HloInstruction(HloOpcode::kCustomCall, shape),
       custom_call_target_(custom_call_target.begin(), custom_call_target.end()),
       feature_group_count_(1),
@@ -2135,12 +2136,13 @@ HloCustomCallInstruction::HloCustomCallInstruction(
   for (auto operand : operands) {
     AppendOperand(operand);
   }
+  AppendComputation(subcomputation);
 }
 
 HloCustomCallInstruction::HloCustomCallInstruction(
     const Shape& shape, absl::Span<HloInstruction* const> operands,
-    absl::string_view custom_call_target, string opaque,
-    absl::Span<const Shape> operand_shapes_with_layout)
+    HloComputation* subcomputation, absl::string_view custom_call_target,
+    string opaque, absl::Span<const Shape> operand_shapes_with_layout)
     : HloInstruction(HloOpcode::kCustomCall, shape),
       custom_call_target_(custom_call_target.begin(), custom_call_target.end()),
       feature_group_count_(1),
@@ -2153,6 +2155,7 @@ HloCustomCallInstruction::HloCustomCallInstruction(
   for (auto operand : operands) {
     AppendOperand(operand);
   }
+  AppendComputation(subcomputation);
 }
 
 HloInstructionProto HloCustomCallInstruction::ToProto() const {
@@ -2256,7 +2259,8 @@ bool HloCustomCallInstruction::IdenticalSlowPath(
   }
   // Note: backend_config comparison is done in Identical, which is the
   // intended/exposed way to compare computations, and so not repeated here.
-  return custom_call_target_ == casted_other.custom_call_target_;
+  return custom_call_target_ == casted_other.custom_call_target_ &&
+         eq_computations(to_apply(), casted_other.to_apply());
 }
 
 std::unique_ptr<HloInstruction>
@@ -2264,7 +2268,7 @@ HloCustomCallInstruction::CloneWithNewOperandsImpl(
     const Shape& shape, absl::Span<HloInstruction* const> new_operands,
     HloCloneContext* context) const {
   auto cloned = absl::make_unique<HloCustomCallInstruction>(
-      shape, new_operands, custom_call_target(), opaque());
+      shape, new_operands, to_apply(), custom_call_target(), opaque());
   if (layout_constrained()) {
     cloned->layout_constrained_ = true;
     cloned->operand_shapes_with_layout_ = operand_shapes_with_layout();

@@ -33,16 +33,28 @@ using HloElementTypeConverterTest = HloTestBase;
 TEST_F(HloElementTypeConverterTest, CustomCallsNotConverted) {
   const string& hlo_string = R"(
     HloModule custom_call
+    ZeroComputation {
+      c = bf16[] constant(0.0)
+      ROOT b = bf16[1,2,3]{0,2,1} broadcast(c), dimensions={}
+    }
     ENTRY CustomCall {
       constant = bf16[1]{0} constant({12345})
       ROOT custom-call = bf16[1,2,3]{0,2,1} custom-call(constant),
-           custom_call_target="foo"
+           custom_call_target="foo", to_apply=ZeroComputation
     }
   )";
   auto module = ParseAndReturnVerifiedModule(hlo_string).ValueOrDie();
   HloElementTypeConverter type_converter(BF16, F32);
   TF_ASSERT_OK_AND_ASSIGN(bool converted, type_converter.Run(module.get()));
-  EXPECT_FALSE(converted);
+  EXPECT_TRUE(converted);
+  // Expect that the root has not changed.
+  const HloInstruction* bf16_root =
+      module->entry_computation()->root_instruction();
+  EXPECT_THAT(bf16_root, op::CustomCall(op::Constant()));
+  // Expect that the zero computation was modified.
+  const HloInstruction* comp_root = bf16_root->to_apply()->root_instruction();
+  EXPECT_THAT(comp_root,
+              op::Convert(op::Broadcast(op::Convert(op::Constant()))));
 }
 
 TEST_F(HloElementTypeConverterTest, InfeedsOutfeedsNotConverted) {

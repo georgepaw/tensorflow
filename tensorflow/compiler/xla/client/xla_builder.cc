@@ -35,6 +35,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
 #include "tensorflow/compiler/xla/service/shape_inference.h"
+#include "tensorflow/compiler/xla/shape_tree.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/util.h"
 
@@ -1508,7 +1509,8 @@ XlaOp XlaBuilder::AfterAll(absl::Span<const XlaOp> tokens) {
 
 XlaOp XlaBuilder::CustomCall(
     const string& call_target_name, absl::Span<const XlaOp> operands,
-    const Shape& shape, const string& opaque,
+    const XlaComputation& subcomputation, const Shape& shape,
+    const string& opaque,
     absl::optional<absl::Span<const Shape>> operand_shapes_with_layout) {
   return ReportErrorOrReturn([&]() -> StatusOr<XlaOp> {
     HloInstructionProto instr;
@@ -1546,6 +1548,7 @@ XlaOp XlaBuilder::CustomCall(
         ++operand_num;
       }
     }
+    AddCalledComputation(subcomputation, &instr);
     return AddInstruction(std::move(instr), HloOpcode::kCustomCall, operands);
   });
 }
@@ -3016,10 +3019,50 @@ XlaOp Call(XlaBuilder* builder, const XlaComputation& computation,
   return builder->Call(computation, operands);
 }
 
+namespace {
+// Creates the default custom call subcomputation which just returns zero
+// constants for a shape `shape` and returns it.
+XlaComputation CreateDefaultCustomCallComputation(const Shape& shape,
+                                                  XlaBuilder* builder) {
+  auto b = builder->CreateSubBuilder("zero_computation");
+
+  ShapeTree<XlaOp> shape_tree(shape);
+  // Iterate over the shape tree in post-order.
+  for (auto itr = shape_tree.rbegin(); itr != shape_tree.rend(); ++itr) {
+    // Get the indexes and the subshape for the current tree node.
+    ShapeIndex index = itr->first;
+    ShapeIndexView index_view = ShapeIndexView(index);
+    Shape subshape = ShapeUtil::GetSubshape(shape, index_view);
+    if (shape_tree.IsLeaf(index_view)) {
+      // For leaves create a broadcast of a zero constant.
+      XlaOp zero =
+          ConstantLiteral(b.get(), LiteralUtil::Zero(subshape.element_type()));
+      itr->second = Broadcast(zero, AsInt64Slice(subshape.dimensions()));
+    } else {
+      // Otherwise create a tuple which refers to its children nodes.
+      const int64 num_children = ShapeUtil::TupleElementCount(subshape);
+      std::vector<XlaOp> children(num_children);
+      // Iterate over all the children of the current node and get their op.
+      for (int64 i = 0; i < num_children; ++i) {
+        index.push_back(i);
+        auto itr = shape_tree.find(ShapeIndexView(index));
+        CHECK(itr != shape_tree.end());
+        children[i] = itr->second;
+        index.pop_back();
+      }
+      itr->second = Tuple(b.get(), children);
+    }
+  }
+  return b->BuildAndNoteError();
+}
+}  // namespace
+
 XlaOp CustomCall(XlaBuilder* builder, const string& call_target_name,
                  absl::Span<const XlaOp> operands, const Shape& shape,
                  const string& opaque) {
-  return builder->CustomCall(call_target_name, operands, shape, opaque,
+  return builder->CustomCall(call_target_name, operands,
+                             CreateDefaultCustomCallComputation(shape, builder),
+                             shape, opaque,
                              /*operand_shapes_with_layout=*/absl::nullopt);
 }
 
@@ -3027,8 +3070,19 @@ XlaOp CustomCallWithLayout(XlaBuilder* builder, const string& call_target_name,
                            absl::Span<const XlaOp> operands, const Shape& shape,
                            absl::Span<const Shape> operand_shapes_with_layout,
                            const string& opaque) {
-  return builder->CustomCall(call_target_name, operands, shape, opaque,
-                             operand_shapes_with_layout);
+  return builder->CustomCall(call_target_name, operands,
+                             CreateDefaultCustomCallComputation(shape, builder),
+                             shape, opaque, operand_shapes_with_layout);
+}
+
+XlaOp CustomCallWithSubComputation(XlaBuilder* builder,
+                                   const string& call_target_name,
+                                   absl::Span<const XlaOp> operands,
+                                   const XlaComputation& subcomputation,
+                                   const Shape& shape, const string& opaque) {
+  return builder->CustomCall(call_target_name, operands, subcomputation, shape,
+                             opaque,
+                             /*operand_shapes_with_layout=*/absl::nullopt);
 }
 
 XlaOp Complex(const XlaOp lhs, const XlaOp rhs,

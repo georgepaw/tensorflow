@@ -1134,9 +1134,14 @@ TEST_F(LayoutAssignmentTest, CustomCallNotLayoutConstrained) {
   const char* module_str = R"(
 HloModule CustomCallNotLayoutConstrained
 
+%ZeroComputation () -> f32[1,2,3,4] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3,4] broadcast(%c), dimensions={}
+}
+
 ENTRY %CustomCallWithNotLayoutConstrained (p: f32[42,2,3]) -> f32[1,2,3,4] {
   %p = f32[42,2,3] parameter(0)
-  ROOT %custom-call = f32[1,2,3,4] custom-call(f32[42,2,3] %p), custom_call_target="baz"
+  ROOT %custom-call = f32[1,2,3,4] custom-call(f32[42,2,3] %p), custom_call_target="baz", to_apply=%ZeroComputation
 }
 )";
   // Try with a couple different layouts. In each case the custom calls operand
@@ -1179,10 +1184,15 @@ TEST_F(LayoutAssignmentTest, CustomCallLayoutConstrained) {
   const char* module_str = R"(
 HloModule CustomCallLayoutConstrained
 
+%ZeroComputation () -> f32[1,2,3,4] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3,4]{3,2,0,1} broadcast(%c), dimensions={}
+}
+
 ENTRY %CustomCallWithLayoutConstraints (p0: f32[4,4], p1: f32[2,3]) -> f32[1,2,3,4] {
   %p0 = f32[4,4] parameter(0)
   %p1 = f32[2,3] parameter(1)
-  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(f32[4,4] %p0, f32[2,3] %p1), custom_call_target="baz", operand_layout_constraints={f32[4,4]{0,1}, f32[2,3]{1,0}}
+  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(f32[4,4] %p0, f32[2,3] %p1), custom_call_target="baz", operand_layout_constraints={f32[4,4]{0,1}, f32[2,3]{1,0}}, to_apply=%ZeroComputation
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(
@@ -1213,8 +1223,13 @@ TEST_F(LayoutAssignmentTest, CustomCallLayoutConstrainedZeroOperands) {
   const char* module_str = R"(
 HloModule CustomCallLayoutConstrainedZeroOperands
 
+%ZeroComputation () -> f32[1,2,3,4] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3,4]{3,2,0,1} broadcast(%c), dimensions={}
+}
+
 ENTRY %CustomCallLayoutConstrainedZeroOperands () -> f32[1,2,3,4] {
-  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(), custom_call_target="baz", operand_layout_constraints={}
+  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(), custom_call_target="baz", operand_layout_constraints={}, to_apply=%ZeroComputation
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(
@@ -1237,11 +1252,16 @@ TEST_F(LayoutAssignmentTest, CustomCallLayoutConstrainedTupleOperand) {
   const char* module_str = R"(
 HloModule CustomCallLayoutConstrainedTupleOperand
 
+%ZeroComputation () -> f32[1,2,3,4] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3,4]{3,2,0,1} broadcast(%c), dimensions={}
+}
+
 ENTRY %CustomCallLayoutConstrainedTupleOperand (p0: f32[4,4], p1: f32[2,3]) -> f32[1,2,3,4] {
   %p0 = f32[4,4] parameter(0)
   %p1 = f32[2,3] parameter(1)
   %tuple = (f32[4,4], f32[2,3]) tuple(%p0, %p1)
-  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(%tuple), custom_call_target="baz", operand_layout_constraints={(f32[4,4]{1,0}, f32[2,3]{0,1})}
+  ROOT %custom-call = f32[1,2,3,4]{3,2,0,1} custom-call(%tuple), custom_call_target="baz", operand_layout_constraints={(f32[4,4]{1,0}, f32[2,3]{0,1})}, to_apply=%ZeroComputation
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(
@@ -1272,9 +1292,17 @@ TEST_F(LayoutAssignmentTest, CustomCallLayoutConstrainedTupleResult) {
   const char* module_str = R"(
 HloModule CustomCallLayoutConstrainedTupleResult
 
+%ZeroComputation () -> (f32[4,4], f32[2,3]) {
+  %c1 = f32[] constant(0)
+  %c2 = f32[] constant(0)
+  %b1 = f32[4,4]{1,0} broadcast(%c1), dimensions={}
+  %b2 = f32[2,3]{0,1} broadcast(%c2), dimensions={}
+  ROOT %t = (f32[4,4]{1,0}, f32[2,3]{0,1}) tuple(%b1, %b2)
+}
+
 ENTRY %CustomCallLayoutConstrainedTupleResult (p0: f32[4,4]) -> (f32[4,4]{1,0}, f32[2,3]{0,1}) {
   %p0 = f32[4,4] parameter(0)
-  ROOT %custom-call = (f32[4,4]{1,0}, f32[2,3]{0,1}) custom-call(%p0), custom_call_target="baz", operand_layout_constraints={f32[4,4]{1,0}}
+  ROOT %custom-call = (f32[4,4]{1,0}, f32[2,3]{0,1}) custom-call(%p0), custom_call_target="baz", operand_layout_constraints={f32[4,4]{1,0}}, to_apply=%ZeroComputation
 }
 )";
   // Try with a couple different layouts. In each case the custom calls operand

@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/gpu/backend_configs.pb.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_casting_utils.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instructions.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
 #include "tensorflow/compiler/xla/service/pattern_matcher.h"
@@ -75,8 +76,10 @@ class GemmRewriterVisitor : public DfsHloRewriteVisitor {
                                          output_shape.dimensions().end() - 2, 1,
                                          std::multiplies<int64>());
       std::unique_ptr<HloInstruction> gemm_call =
-          HloInstruction::CreateCustomCall(output_shape, {lhs, rhs},
-                                           kGemmCallTarget);
+          HloInstruction::CreateCustomCall(
+              output_shape, {lhs, rhs},
+              CreateZeroComputationInModule(lhs->GetModule(), output_shape),
+              kGemmCallTarget);
       GemmBackendConfig gemm_config;
       gemm_config.set_alpha_real(1.0);
       gemm_config.set_alpha_imag(0.0);
@@ -131,7 +134,8 @@ class GemmRewriterVisitor : public DfsHloRewriteVisitor {
                 instr->shape(),
                 {existing_gemm->mutable_operand(0),
                  existing_gemm->mutable_operand(1), bias},
-                kGemmCallTarget);
+                CreateZeroComputationInModule(instr->GetModule(),
+                                              instr->shape()) kGemmCallTarget);
         TF_RETURN_IF_ERROR(gemm_call->set_backend_config(config));
         TF_RETURN_IF_ERROR(
             ReplaceWithNewInstruction(instr, std::move(gemm_call)));

@@ -134,6 +134,7 @@ void HloModule::ReplaceComputations(
       switch (instruction->opcode()) {
         case HloOpcode::kAllReduce:
         case HloOpcode::kCall:
+        case HloOpcode::kCustomCall:
         case HloOpcode::kMap:
         case HloOpcode::kReduce:
         case HloOpcode::kReduceWindow:

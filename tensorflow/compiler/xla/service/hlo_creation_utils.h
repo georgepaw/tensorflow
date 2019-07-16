@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/statusor.h"
 
 namespace xla {
+class HloModule;
 
 // Some lightweight utilities intended to make HLO instruction creation more
 // ergonomic.  We don't have a complete set of helpers yet -- I expect we'll
@@ -236,6 +237,15 @@ HloInstruction* BroadcastZeros(HloComputation* computation,
 StatusOr<std::unique_ptr<HloComputation>> CreateComputationWithSignature(
     absl::Span<const Shape* const> domain, const Shape& range,
     absl::string_view name);
+
+// Creates a computation which returns zero constants for a shape `shape`.
+std::unique_ptr<HloComputation> CreateZeroComputation(
+    const Shape& shape, string name = "zero_computation");
+
+// Same as CreateZeroComputation, but adds the computation to "module".
+HloComputation* CreateZeroComputationInModule(HloModule* module,
+                                              const Shape& shape,
+                                              string name = "zero_computation");
 
 }  // namespace xla
 

@@ -512,6 +512,12 @@ TEST_F(WhileLoopSimplifierTest,
        LoopWithNonTupleBodyRootInstructionNotSimplified) {
   const string hlo_string = R"(
   HloModule SimpleLoop
+  ZeroComputation {
+    c1 = s32[] constant(0)
+    c2 = s32[] constant(0)
+    b2 = s32[3]{0} broadcast(c2), dimensions={}
+    ROOT tuple = (s32[], s32[3]{0}) tuple(c1, b2)
+  }
   SimpleLoop.body {
     loop_var.1 = (s32[], s32[3]{0}) parameter(0)
     get-tuple-element.1 = s32[] get-tuple-element(loop_var.1), index=0
@@ -520,7 +526,7 @@ TEST_F(WhileLoopSimplifierTest,
     get-tuple-element.2 = s32[3]{0} get-tuple-element(loop_var.1), index=1
     multiply = s32[3]{0} multiply(get-tuple-element.2, get-tuple-element.2)
     ROOT custom-call = (s32[], s32[3]{0}) custom-call(add, multiply),
-      custom_call_target="x"
+      custom_call_target="x", to_apply=ZeroComputation
   }
   SimpleLoop.condition {
     loop_var.2 = (s32[], s32[3]{0}) parameter(0)

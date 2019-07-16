@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/hlo_module.h"
 #include "tensorflow/compiler/xla/service/hlo_module_config.h"
 #include "tensorflow/compiler/xla/service/shape_inference.h"
+#include "tensorflow/compiler/xla/shape_tree.h"
 #include "tensorflow/compiler/xla/util.h"
 
 namespace xla {
@@ -480,4 +481,41 @@ StatusOr<std::unique_ptr<HloComputation>> CreateComputationWithSignature(
   return b.Build();
 }
 
+std::unique_ptr<HloComputation> CreateZeroComputation(const Shape& shape,
+                                                      string name) {
+  HloComputation::Builder b(name);
+
+  ShapeTree<HloInstruction*> shape_tree(shape);
+  // Iterate over the shape tree in post-order to create a .
+  for (auto itr = shape_tree.rbegin(); itr != shape_tree.rend(); ++itr) {
+    // Get the indexes and the subshape for the current tree node.
+    ShapeIndex index = itr->first;
+    ShapeIndexView index_view = ShapeIndexView(index);
+    Shape subshape = ShapeUtil::GetSubshape(shape, index_view);
+    if (shape_tree.IsLeaf(index_view)) {
+      // For leaves create a broadcast of a zero constant.
+      auto zero = b.AddInstruction(HloInstruction::CreateConstant(
+          LiteralUtil::Zero(subshape.element_type())));
+      itr->second =
+          b.AddInstruction(HloInstruction::CreateBroadcast(subshape, zero, {}));
+    } else {
+      // Otherwise create a tuple which refers to its children nodes.
+      const int64 num_children = ShapeUtil::TupleElementCount(subshape);
+      std::vector<HloInstruction*> children(num_children);
+      for (int64 i = 0; i < num_children; ++i) {
+        index.push_back(i);
+        auto itr = shape_tree.find(ShapeIndexView(index));
+        children[i] = itr->second;
+        index.pop_back();
+      }
+      itr->second = b.AddInstruction(HloInstruction::CreateTuple(children));
+    }
+  }
+  return b.Build();
+}
+
+HloComputation* CreateZeroComputationInModule(HloModule* module,
+                                              const Shape& shape, string name) {
+  return module->AddEmbeddedComputation(CreateZeroComputation(shape, name));
+}
 }  // namespace xla

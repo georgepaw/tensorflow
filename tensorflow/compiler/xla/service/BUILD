@@ -430,6 +430,7 @@ tf_cc_test(
     deps = [
         ":hlo",
         ":hlo_runner",
+        ":hlo_creation_utils",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:test",
         "//tensorflow/compiler/xla:test_helpers",

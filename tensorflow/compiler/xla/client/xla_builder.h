@@ -442,7 +442,8 @@ class XlaBuilder {
 
   XlaOp CustomCall(
       const string& call_target_name, absl::Span<const XlaOp> operands,
-      const Shape& shape_with_layout, const string& opaque,
+      const XlaComputation& computation, const Shape& shape_with_layout,
+      const string& opaque,
       absl::optional<absl::Span<const Shape>> operand_shapes_with_layout);
 
   XlaOp Reduce(const XlaOp& operand, const XlaOp& init_value,
@@ -833,6 +834,10 @@ class XlaBuilder {
       XlaBuilder* builder, const string& call_target_name,
       absl::Span<const XlaOp> operands, const Shape& shape_with_layout,
       absl::Span<const Shape> operand_shapes_with_layout, const string& opaque);
+  friend XlaOp CustomCallWithSubComputation(
+      XlaBuilder* builder, const string& call_target_name,
+      absl::Span<const XlaOp> operands, const XlaComputation& subcomputation,
+      const Shape& shape, const string& opaque);
   friend XlaOp Complex(XlaOp real, XlaOp imag,
                        absl::Span<const int64> broadcast_dimensions);
   friend XlaOp Conj(XlaOp operand);
@@ -1453,6 +1458,15 @@ XlaOp CustomCallWithLayout(XlaBuilder* builder, const string& call_target_name,
                            const Shape& shape_with_layout,
                            absl::Span<const Shape> operand_shapes_with_layout,
                            const string& opaque = "");
+
+// Overload which constructs a custom call with a subcomputation which can be
+// used by the backend to determine the behaviour of the custom call.
+XlaOp CustomCallWithSubComputation(XlaBuilder* builder,
+                                   const string& call_target_name,
+                                   absl::Span<const XlaOp> operands,
+                                   const XlaComputation& subcomputation,
+                                   const Shape& shape,
+                                   const string& opaque = "");
 
 // The following methods enqueue element-wise binary arithmetic operations
 // onto the computation. The shapes of the operands have to match unless one

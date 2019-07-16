@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/literal_util.h"
 #include "tensorflow/compiler/xla/service/custom_call_target_registry.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
@@ -84,8 +85,9 @@ XLA_TEST_F(CustomCallTest, CustomCallR0F32Add2) {
 
   auto constant = builder.AddInstruction(
       HloInstruction::CreateConstant(LiteralUtil::CreateR0<float>(42.0f)));
-  builder.AddInstruction(
-      HloInstruction::CreateCustomCall(r0f32_, {constant}, "R0F32Add2"));
+  builder.AddInstruction(HloInstruction::CreateCustomCall(
+      r0f32_, {constant}, CreateZeroComputationInModule(module.get(), r0f32_),
+      "R0F32Add2"));
 
   module->AddEntryComputation(builder.Build());
 
@@ -105,8 +107,9 @@ XLA_TEST_F(CustomCallTest, CustomCallR2F32Reduce) {
 
   auto constant = builder.AddInstruction(
       HloInstruction::CreateConstant(LiteralUtil::CreateR2FromArray2D(array)));
-  builder.AddInstruction(
-      HloInstruction::CreateCustomCall(r0f32_, {constant}, "R2F32ReduceSum"));
+  builder.AddInstruction(HloInstruction::CreateCustomCall(
+      r0f32_, {constant}, CreateZeroComputationInModule(module.get(), r0f32_),
+      "R2F32ReduceSum"));
 
   module->AddEntryComputation(builder.Build());
 
@@ -121,10 +124,15 @@ XLA_TEST_F(CustomCallTest, UsedInOtherComputations) {
   auto input = b.AddInstruction(
       HloInstruction::CreateConstant(LiteralUtil::CreateR2FromArray2D(
           Array2D<float>{{1.0f, 2.0f}, {3.0f, 4.0f}})));
+  auto custom_call_shape = ShapeUtil::MakeShape(F32, {1, 2, 2});
   auto incremented = b.AddInstruction(HloInstruction::CreateCustomCall(
-      ShapeUtil::MakeShape(F32, {1, 2, 2}), {input}, "Add1ToValues"));
+      custom_call_shape, {input},
+      CreateZeroComputationInModule(module.get(), custom_call_shape),
+      "Add1ToValues"));
   auto incremented_again = b.AddInstruction(HloInstruction::CreateCustomCall(
-      ShapeUtil::MakeShape(F32, {1, 2, 2}), {incremented}, "Add1ToValues"));
+      custom_call_shape, {incremented},
+      CreateZeroComputationInModule(module.get(), custom_call_shape),
+      "Add1ToValues"));
 
   // Concatenate the values along first dim.
   b.AddInstruction(
@@ -144,12 +152,15 @@ XLA_TEST_F(CustomCallTest, InputAndOutputLayoutDiffer) {
 
   auto input =
       b.AddInstruction(HloInstruction::CreateParameter(0, r2f32_, "p"));
-  b.AddInstruction(
-      HloInstruction::CreateCustomCall(r2f32_, {input}, "Add1ToValues"));
+  b.AddInstruction(HloInstruction::CreateCustomCall(
+      r2f32_, {input}, CreateZeroComputationInModule(module.get(), r2f32_),
+      "Add1ToValues"));
 
   module->AddEntryComputation(b.Build());
   ForceParameterLayout(module.get(), 0, LayoutUtil::MakeLayout({1, 0}));
+  VLOG(0) << module->ToString();
   ForceResultLayout(module.get(), LayoutUtil::MakeLayout({0, 1}));
+  VLOG(0) << module->ToString();
 
   Literal argument = LiteralUtil::CreateR2<float>({{1.f, 2.f}, {3.f, 4.f}});
 
@@ -173,7 +184,9 @@ XLA_TEST_F(CustomCallTest, LayoutConstrained) {
   const Shape& r2f32_dim0_major =
       ShapeUtil::MakeShapeWithLayout(F32, {2, 2}, {1, 0});
   auto custom_call = b.AddInstruction(HloInstruction::CreateCustomCall(
-      r2f32_dim0_major, {input}, "Add1ToValues", {r2f32_dim0_major}));
+      r2f32_dim0_major, {input},
+      CreateZeroComputationInModule(module.get(), r2f32_dim0_major),
+      "Add1ToValues", {r2f32_dim0_major}));
   b.AddInstruction(
       custom_call->CloneWithNewOperands(r2f32_dim0_major, {custom_call}));
 
@@ -190,10 +203,14 @@ XLA_TEST_F(CustomCallTest, LayoutConstrained) {
 XLA_TEST_F(CustomCallTest, TupleOutput) {
   const char* kModuleStr = R"(
     HloModule m
+    zero_comp () -> f32[1,2,3] {
+      %c = f32[] constant(0)
+      ROOT %b = f32[1,2,3]{0,2,1} broadcast(f32[] %c), dimensions={}
+    }
     test {
       p0 = f32[] parameter(0)
       p1 = f32[] parameter(1)
-      ROOT %custom-call = (f32[], f32[]) custom-call(f32[] %p0, f32[] %p1), custom_call_target="F32TupleSwap", operand_layout_constraints={f32[], f32[]}
+      ROOT %custom-call = (f32[], f32[]) custom-call(f32[] %p0, f32[] %p1), custom_call_target="F32TupleSwap", operand_layout_constraints={f32[], f32[]}, to_apply=zero_comp
     }
   )";
   TF_ASSERT_OK_AND_ASSIGN(auto module,

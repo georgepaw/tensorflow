@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/dfs_hlo_visitor_with_default.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
 #include "tensorflow/compiler/xla/util.h"
@@ -90,7 +91,9 @@ StatusOr<HloInstruction*> CreateCholesky(CusolverContext* context,
 
   HloInstruction* custom_call =
       computation->AddInstruction(HloInstruction::CreateCustomCall(
-          call_shape, {operand}, kCusolverCholeskyCallTarget, {a_shape}));
+          call_shape, {operand},
+          CreateZeroComputationInModule(operand->GetModule(), call_shape),
+          kCusolverCholeskyCallTarget, {a_shape}));
   custom_call->set_metadata(metadata);
   TF_RETURN_IF_ERROR(custom_call->set_backend_config(options));
   HloInstruction* out = computation->AddInstruction(

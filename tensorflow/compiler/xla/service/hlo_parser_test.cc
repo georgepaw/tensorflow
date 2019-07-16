@@ -387,9 +387,14 @@ ENTRY %CallR0F32IdentityScalar.v2 () -> f32[] {
 "CustomCallWithOpaque",
 R"(HloModule custom_call
 
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,2,1} broadcast(f32[] %c), dimensions={}
+}
+
 ENTRY %CustomCall () -> f32[1,2,3] {
   %constant = f32[1]{0} constant({12345})
-  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(f32[1]{0} %constant), custom_call_target="foo\"bar", backend_config="this string is opaque"
+  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(f32[1]{0} %constant), custom_call_target="foo\"bar", to_apply=%ZeroComputation, backend_config="this string is opaque"
 }
 
 )"
@@ -931,10 +936,15 @@ ENTRY %ConstantUnsignedNoOverflow () -> u64[] {
 "CustomCallWithLayoutConstraints",
 R"(HloModule CustomCallWithLayoutConstraints
 
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,2,1} broadcast(f32[] %c), dimensions={}
+}
+
 ENTRY %CustomCallWithLayoutConstraints (p0: f32[42,2,3], p1: f32[123,4]) -> f32[1,2,3] {
   %p0 = f32[42,2,3]{0,1,2} parameter(0)
   %p1 = f32[123,4]{0,1} parameter(1)
-  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}, f32[123,4]{1,0}}
+  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}, f32[123,4]{1,0}}, to_apply=%ZeroComputation
 }
 
 )"
@@ -944,8 +954,13 @@ ENTRY %CustomCallWithLayoutConstraints (p0: f32[42,2,3], p1: f32[123,4]) -> f32[
 "CustomCallWithLayoutConstraintsNoOperands",
 R"(HloModule CustomCallWithLayoutConstraintsNoOperands
 
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,2,1} broadcast(f32[] %c), dimensions={}
+}
+
 ENTRY %CustomCallWithLayoutConstraints () -> f32[1,2,3] {
-  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(), custom_call_target="baz", operand_layout_constraints={}
+  ROOT %custom-call = f32[1,2,3]{0,2,1} custom-call(), custom_call_target="baz", operand_layout_constraints={}, to_apply=%ZeroComputation
 }
 
 )"
@@ -955,10 +970,18 @@ ENTRY %CustomCallWithLayoutConstraints () -> f32[1,2,3] {
 "CustomCallWithLayoutConstraintsTupleShapes",
 R"(HloModule CustomCallWithLayoutConstraintsTupleShapes
 
+%ZeroComputation () -> (f32[1,2,3], f32[1,2,3]) {
+  %c1 = f32[] constant(0)
+  %b1 = f32[1,2,3]{0,2,1} broadcast(f32[] %c1), dimensions={}
+  %c2 = f32[] constant(0)
+  %b2 = f32[1,2,3]{1,2,0} broadcast(f32[] %c2), dimensions={}
+  ROOT %t = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) tuple(f32[1,2,3]{0,2,1} %b1, f32[1,2,3]{1,2,0} %b2)
+}
+
 ENTRY %CustomCallWithLayoutConstraints (p0: (f32[2,2], f32[42,2,3]), p1: f32[123,4]) -> (f32[1,2,3], f32[1,2,3]) {
   %p0 = (f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) parameter(0)
   %p1 = f32[123,4]{0,1} parameter(1)
-  ROOT %custom-call = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) custom-call((f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={(f32[2,2]{1,0}, f32[42,2,3]{2,0,1}), f32[123,4]{1,0}}
+  ROOT %custom-call = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) custom-call((f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={(f32[2,2]{1,0}, f32[42,2,3]{2,0,1}), f32[123,4]{1,0}}, to_apply=%ZeroComputation
 }
 
 )"
@@ -968,10 +991,18 @@ ENTRY %CustomCallWithLayoutConstraints (p0: (f32[2,2], f32[42,2,3]), p1: f32[123
 "CustomCallWithHasSideEffect",
 R"(HloModule CustomCallWithHasSideEffect
 
+%ZeroComputation () -> (f32[1,2,3], f32[1,2,3]) {
+  %c1 = f32[] constant(0)
+  %b1 = f32[1,2,3]{0,2,1} broadcast(f32[] %c1), dimensions={}
+  %c2 = f32[] constant(0)
+  %b2 = f32[1,2,3]{1,2,0} broadcast(f32[] %c2), dimensions={}
+  ROOT %t = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) tuple(f32[1,2,3]{0,2,1} %b1, f32[1,2,3]{1,2,0} %b2)
+}
+
 ENTRY %CustomCallWithHasSideEffect (p0: (f32[2,2], f32[42,2,3]), p1: f32[123,4]) -> (f32[1,2,3], f32[1,2,3]) {
   %p0 = (f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) parameter(0)
   %p1 = f32[123,4]{0,1} parameter(1)
-  ROOT %custom-call = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) custom-call((f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", custom_call_has_side_effect=true
+  ROOT %custom-call = (f32[1,2,3]{0,2,1}, f32[1,2,3]{1,2,0}) custom-call((f32[2,2]{0,1}, f32[42,2,3]{0,1,2}) %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", custom_call_has_side_effect=true, to_apply=%ZeroComputation
 }
 
 )"
@@ -1324,9 +1355,14 @@ ENTRY Parameters1.v4 {
 "CustomCall",
 R"(HloModule custom_call
 
+ZeroComputation {
+  c = f32[] constant(0)
+  ROOT b = f32[1,2,3]{0,2,1} broadcast(c), dimensions={}
+}
+
 ENTRY CustomCall {
   constant = f32[1]{0} constant({12345})
-  ROOT custom-call = f32[1,2,3]{0,2,1} custom-call(constant), custom_call_target="foo\"bar"
+  ROOT custom-call = f32[1,2,3]{0,2,1} custom-call(constant), custom_call_target="foo\"bar", to_apply=ZeroComputation
 }
 
 )"
@@ -1496,8 +1532,13 @@ ENTRY Iota {
 "CustomCallWithWindowAndDimLabelsAndFeatureGroupCount",
 R"(HloModule CustomCallWithWindowAndDimLabelsAndFeatureGroupCount
 
+ZeroComputation {
+  c = f32[] constant(0)
+  ROOT b = f32[100]{0} broadcast(c), dimensions={}
+}
+
 ENTRY Computation {
-  ROOT r = f32[100]{0} custom-call(), window={size=2x2}, dim_labels=b01f_01io->b01f, feature_group_count=2, custom_call_target="target"
+  ROOT r = f32[100]{0} custom-call(), window={size=2x2}, dim_labels=b01f_01io->b01f, feature_group_count=2, custom_call_target="target", to_apply=ZeroComputation
 }
 
 )"
@@ -2099,9 +2140,14 @@ ENTRY %test_comma.v4 () -> f32[] {
 TEST_F(HloParserTest, ComputationShapeDoesNotMatchRootShape) {
   const string original = R"(HloModule custom_call:
 
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,2,1} broadcast(f32[] %c), dimensions={}
+}
+
 ENTRY %CustomCall () -> f32[1] {
   %constant = f32[1]{0} constant({12345})
-  ROOT %foo = f32[1,2,3]{0,2,1} custom-call(f32[1]{0} %constant), custom_call_target="foo\"bar"
+  ROOT %foo = f32[1,2,3]{0,2,1} custom-call(f32[1]{0} %constant), custom_call_target="foo\"bar", to_apply=%ZeroComputation
 })";
   ExpectHasSubstr(
       ParseAndReturnUnverifiedModule(original).status().error_message(),
@@ -2664,10 +2710,15 @@ ENTRY %axpy.v5 (alpha: f32[], x: f32[2,4], y: f32[2,4]) -> f32[2,4] {
 TEST_F(HloParserTest, CustomCallWrongNumberofOperandConstraints) {
   const string original = R"(HloModule CustomCallWrongNumberofOperandConstraints
 
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,1,2} broadcast(f32[] %c), dimensions={}
+}
+
 ENTRY %CustomCallWrongNumberofOperandConstraints (p0: f32[42,2,3], p1: f32[123,4]) -> f32[1,2,3] {
   %p0 = f32[42,2,3]{0,1,2} parameter(0)
   %p1 = f32[123,4]{0,1} parameter(1)
-  ROOT %custom-call = f32[1,2,3]{0,1,2} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}}
+  ROOT %custom-call = f32[1,2,3]{0,1,2} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}}, to_apply=%ZeroComputation
 }
 
 )";
@@ -2676,13 +2727,33 @@ ENTRY %CustomCallWrongNumberofOperandConstraints (p0: f32[42,2,3], p1: f32[123,4
       "Expected 2 operand layout constraints, 1 given");
 }
 
+TEST_F(HloParserTest, CustomCallNoToApply) {
+  const string original = R"(HloModule CustomCallNoToApply
+
+ENTRY %CustomCallNoToApply (p0: f32[42,2,3], p1: f32[123,4]) -> f32[1,2,3] {
+  %p0 = f32[42,2,3]{0,1,2} parameter(0)
+  %p1 = f32[123,4]{0,1} parameter(1)
+  ROOT %custom-call = f32[1,2,3]{0,1,2} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz"
+}
+
+)";
+  ExpectHasSubstr(
+      ParseAndReturnUnverifiedModule(original).status().error_message(),
+      "error: attribute to_apply is expected but not seen");
+}
+
 TEST_F(HloParserTest, CustomCallIncompatibleOperandConstraints) {
   const string original = R"(HloModule CustomCallIncompatibleOperandConstraints
+
+%ZeroComputation () -> f32[1,2,3] {
+  %c = f32[] constant(0)
+  ROOT %b = f32[1,2,3]{0,1,2} broadcast(%c), dimensions={}
+}
 
 ENTRY %CustomCallIncompatibleOperandConstraints (p0: f32[42,2,3], p1: f32[123,4]) -> f32[1,2,3] {
   %p0 = f32[42,2,3]{0,1,2} parameter(0)
   %p1 = f32[123,4]{0,1} parameter(1)
-  ROOT %custom-call = f32[1,2,3]{0,1,2} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}, f32[555,5]{1,0}}
+  ROOT %custom-call = f32[1,2,3]{0,1,2} custom-call(f32[42,2,3]{0,1,2} %p0, f32[123,4]{0,1} %p1), custom_call_target="baz", operand_layout_constraints={f32[42,2,3]{0,1,2}, f32[555,5]{1,0}}, to_apply=%ZeroComputation
 }
 
 )";

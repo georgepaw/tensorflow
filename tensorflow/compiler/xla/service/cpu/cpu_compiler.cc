@@ -698,6 +698,7 @@ StatusOr<std::unique_ptr<Executable>> CpuCompiler::RunBackend(
                 schedule.sequence(embedded_computation).instructions())
             .status());
   }
+
   string function_name_prefix = entry_computation->name().empty()
                                     ? "__compute"
                                     : entry_computation->name();

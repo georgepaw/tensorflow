@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/gpu/backend_configs.pb.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/util.h"
 #include "tensorflow/compiler/xla/window_util.h"
@@ -55,8 +56,11 @@ HloInstruction* CreateCudnnConv(const char* call_target, const Shape& shape,
   Shape call_shape =
       ShapeUtil::MakeTupleShape({shape, ShapeUtil::MakeShape(U8, {0})});
 
-  HloInstruction* custom_call = computation->AddInstruction(
-      HloInstruction::CreateCustomCall(call_shape, {lhs, rhs}, call_target));
+  HloInstruction* custom_call =
+      computation->AddInstruction(HloInstruction::CreateCustomCall(
+          call_shape, {lhs, rhs},
+          CreateZeroComputationInModule(lhs->GetModule(), call_shape),
+          call_target));
   custom_call->set_window(window);
   custom_call->set_convolution_dimension_numbers(dnums);
   custom_call->set_feature_group_count(feature_group_count);

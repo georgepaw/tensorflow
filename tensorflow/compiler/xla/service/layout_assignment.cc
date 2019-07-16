@@ -637,6 +637,9 @@ Status LayoutAssignment::AddMandatoryConstraints(
           /*mandatory=*/true));
       TF_RETURN_IF_ERROR(constraints->SetInstructionLayout(
           best_branch_computation_layout.result_shape(), instruction));
+    } else if (instruction->opcode() == HloOpcode::kCustomCall) {
+      // TODO propagate layout from callsite to a clone of this computation.
+      VLOG(1) << "Unsupported";
     }
   }
   // Finally set the result layout to match ComputationLayout, if there is one.

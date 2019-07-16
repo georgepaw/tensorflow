@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/gpu/gemm_rewriter.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_matchers.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
@@ -127,6 +128,7 @@ TEST_F(LayoutAssignmentTest, BatchNormInference) {
           "input_shape=", ShapeUtil::HumanStringWithLayout(input_shape),
           ", result_shape=", ShapeUtil::HumanStringWithLayout(result_shape)));
 
+      auto module = CreateNewVerifiedModule();
       auto builder = HloComputation::Builder(TestName());
       auto* operand = builder.AddInstruction(
           HloInstruction::CreateParameter(0, shape, "operand"));
@@ -144,13 +146,12 @@ TEST_F(LayoutAssignmentTest, BatchNormInference) {
       auto* feature_index =
           builder.AddInstruction(HloInstruction::CreateConstant(
               LiteralUtil::CreateR0<int64>(kFeatureIndex)));
-
       auto* batchnorm = builder.AddInstruction(HloInstruction::CreateCustomCall(
           shape,
           {operand, scale, offset, mean, variance, epsilon, feature_index},
+          CreateZeroComputationInModule(module.get(), shape),
           kCudnnBatchNormForwardInferenceCallTarget));
 
-      auto module = CreateNewVerifiedModule();
       HloComputation* computation =
           module->AddEntryComputation(builder.Build(batchnorm));
 
@@ -201,6 +202,7 @@ TEST_F(LayoutAssignmentTest, BatchNormTraining) {
           "input_shape=", ShapeUtil::HumanStringWithLayout(input_shape),
           ", result_shape=", ShapeUtil::HumanStringWithLayout(result_shape)));
 
+      auto module = CreateNewVerifiedModule();
       auto builder = HloComputation::Builder(TestName());
       auto* operand = builder.AddInstruction(
           HloInstruction::CreateParameter(0, shape, "operand"));
@@ -217,9 +219,9 @@ TEST_F(LayoutAssignmentTest, BatchNormTraining) {
 
       auto* batchnorm = builder.AddInstruction(HloInstruction::CreateCustomCall(
           batchnorm_shape, {operand, scale, offset, epsilon, feature_index},
+          CreateZeroComputationInModule(module.get(), batchnorm_shape),
           kCudnnBatchNormForwardTrainingCallTarget));
 
-      auto module = CreateNewVerifiedModule();
       HloComputation* computation =
           module->AddEntryComputation(builder.Build(batchnorm));
 
@@ -275,6 +277,7 @@ TEST_F(LayoutAssignmentTest, BatchNormGrad) {
             "input_shape=", ShapeUtil::HumanStringWithLayout(input_shape),
             ", result_shape=", ShapeUtil::HumanStringWithLayout(result_shape)));
 
+        auto module = CreateNewVerifiedModule();
         auto builder = HloComputation::Builder(TestName());
         auto* operand = builder.AddInstruction(
             HloInstruction::CreateParameter(0, shape, "operand"));
@@ -298,9 +301,9 @@ TEST_F(LayoutAssignmentTest, BatchNormGrad) {
                 batchnorm_shape,
                 {operand, scale, mean, var, grad_offset, epsilon,
                  feature_index},
+                CreateZeroComputationInModule(module.get(), batchnorm_shape),
                 kCudnnBatchNormBackwardCallTarget));
 
-        auto module = CreateNewVerifiedModule();
         HloComputation* computation =
             module->AddEntryComputation(builder.Build(batchnorm));
 

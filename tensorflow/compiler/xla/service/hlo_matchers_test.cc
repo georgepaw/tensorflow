@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/compiler/xla/service/hlo_matchers.h"
 #include "tensorflow/compiler/xla/literal_util.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_parser.h"
 #include "tensorflow/compiler/xla/shape_util.h"
 
@@ -76,12 +77,14 @@ TEST(HloMatchersTest, Test) {
 }
 
 TEST(HloMatchersTest, CustomCallMatcher) {
+  auto custom_call_shape = ShapeUtil::MakeShape(F32, {1});
+  auto zero_comp = CreateZeroComputation(custom_call_shape);
   auto c1 =
       HloInstruction::CreateConstant(LiteralUtil::CreateR1<float>({1, 2, 3}));
   auto c2 =
       HloInstruction::CreateConstant(LiteralUtil::CreateR1<int32>({1, 2, 3}));
   auto call = HloInstruction::CreateCustomCall(
-      ShapeUtil::MakeShape(F32, {1}), {c1.get(), c2.get()}, "foo_target");
+      custom_call_shape, {c1.get(), c2.get()}, zero_comp.get(), "foo_target");
 
   EXPECT_THAT(call.get(), op::CustomCall());
   EXPECT_THAT(call.get(), op::CustomCall(c1.get(), c2.get()));

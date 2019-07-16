@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/literal_util.h"
 #include "tensorflow/compiler/xla/service/hlo_casting_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_instructions.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
@@ -93,15 +94,19 @@ TEST_F(HloDceTest, InstructionsWithSideEffect) {
 
 TEST_F(HloDceTest, CustomCallInstructionsWithSideEffect) {
   // Verify that custom call instruction with side-effect is not removed.
+  auto module = CreateNewVerifiedModule();
   auto builder = HloComputation::Builder(TestName());
-  auto instr = Cast<HloCustomCallInstruction>(builder.AddInstruction(
-      HloInstruction::CreateCustomCall(ShapeUtil::MakeShape(F32, {}),
-                                       /*operands=*/{},
-                                       /*custom_call_target=*/"foo")));
+  auto custom_call_shape = ShapeUtil::MakeShape(F32, {});
+  auto instr = Cast<HloCustomCallInstruction>(
+      builder.AddInstruction(HloInstruction::CreateCustomCall(
+          custom_call_shape,
+          /*operands=*/{},
+          /*subcomputation*/
+          CreateZeroComputationInModule(module.get(), custom_call_shape),
+          /*custom_call_target=*/"foo")));
   instr->set_custom_call_has_side_effect(true);
   builder.AddInstruction(HloInstruction::CreateTuple({}));
 
-  auto module = CreateNewVerifiedModule();
   module->AddEntryComputation(builder.Build());
 
   HloDCE dce;
@@ -111,14 +116,17 @@ TEST_F(HloDceTest, CustomCallInstructionsWithSideEffect) {
 
 TEST_F(HloDceTest, CustomCallInstructionsWithoutSideEffect) {
   // Verify that custom call instruction without side-effect is removed.
+  auto module = CreateNewVerifiedModule();
   auto builder = HloComputation::Builder(TestName());
-  builder.AddInstruction(
-      HloInstruction::CreateCustomCall(ShapeUtil::MakeShape(F32, {}),
-                                       /*operands=*/{},
-                                       /*custom_call_target=*/"foo"));
+  auto custom_call_shape = ShapeUtil::MakeShape(F32, {});
+  builder.AddInstruction(HloInstruction::CreateCustomCall(
+      custom_call_shape,
+      /*operands=*/{},
+      /*subcomputation*/
+      CreateZeroComputationInModule(module.get(), custom_call_shape),
+      /*custom_call_target=*/"foo"));
   builder.AddInstruction(HloInstruction::CreateTuple({}));
 
-  auto module = CreateNewVerifiedModule();
   module->AddEntryComputation(builder.Build());
 
   HloDCE dce;

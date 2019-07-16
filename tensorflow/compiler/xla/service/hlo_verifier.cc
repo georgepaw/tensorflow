@@ -48,6 +48,7 @@ bool IsCallerInstruction(HloInstruction* hlo) {
   switch (hlo->opcode()) {
     case HloOpcode::kCall:
     case HloOpcode::kConditional:
+    case HloOpcode::kCustomCall:
     case HloOpcode::kWhile:
     case HloOpcode::kAllReduce:
     case HloOpcode::kMap:
@@ -666,7 +667,9 @@ Status ShapeVerifier::HandleCustomCall(HloInstruction* instruction) {
       TF_RET_CHECK(LayoutUtil::HasLayout(operand_shape_with_layout));
     }
   }
-  return Status::OK();
+  // The shape of kCustomCall should match the shape of its subcomputation.
+  return CheckShape(custom_call,
+                    custom_call->to_apply()->root_instruction()->shape());
 }
 
 Status ShapeVerifier::HandleSlice(HloInstruction* slice) {

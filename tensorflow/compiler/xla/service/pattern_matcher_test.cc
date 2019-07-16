@@ -581,8 +581,12 @@ TEST(PatternMatcherTest, CustomCallTargetMatcherDescribeAndExplain) {
   constexpr char kModuleStr[] = R"(
     HloModule test_module
 
+    ZeroComputation {
+      ROOT c = f32[] constant(0)
+    }
+
     ENTRY test {
-      ROOT out = f32[] custom-call(), custom_call_target="test_target"
+      ROOT out = f32[] custom-call(), custom_call_target="test_target", to_apply=ZeroComputation
     }
   )";
 
@@ -597,7 +601,8 @@ TEST(PatternMatcherTest, CustomCallTargetMatcherDescribeAndExplain) {
       root, match::Op().WithCustomCallTarget("other_target"),
       "an HloInstruction custom call with target 'other_target'",
       "HloInstruction is not a custom call with a target 'other_target'\nin "
-      "out = f32[] custom-call(), custom_call_target=\"test_target\"");
+      "out = f32[] custom-call(), custom_call_target=\"test_target\", "
+      "to_apply=ZeroComputation");
 }
 
 TEST(PatternMatcherTest, ShapeDescribeToAndExplain) {

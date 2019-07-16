@@ -460,6 +460,9 @@ StatusOr<std::unique_ptr<HloInstruction>> HloInstruction::CreateFromProto(
                                            operands(2), computations(1));
       break;
     case HloOpcode::kCustomCall: {
+      TF_RET_CHECK(proto.called_computation_ids_size() == 1)
+          << "kCustomCall should have 1 called computation but sees "
+          << proto.called_computation_ids_size();
       if (proto.constrain_layout()) {
         // A proto RepeatedPtrField cannot be converted to a Span (it is a
         // vector of pointers essentially) so create a vector of shapes to pass
@@ -469,13 +472,13 @@ StatusOr<std::unique_ptr<HloInstruction>> HloInstruction::CreateFromProto(
              proto.operand_shapes_with_layout()) {
           operand_shapes.emplace_back(shape_proto);
         }
-        instruction =
-            CreateCustomCall(shape, all_operands(), proto.custom_call_target(),
-                             operand_shapes, proto.backend_config());
+        instruction = CreateCustomCall(shape, all_operands(), computations(0),
+                                       proto.custom_call_target(),
+                                       operand_shapes, proto.backend_config());
       } else {
-        instruction =
-            CreateCustomCall(shape, all_operands(), proto.custom_call_target(),
-                             proto.backend_config());
+        instruction = CreateCustomCall(shape, all_operands(), computations(0),
+                                       proto.custom_call_target(),
+                                       proto.backend_config());
       }
       auto custom_call_instr =
           Cast<HloCustomCallInstruction>(instruction.get());
@@ -628,7 +631,8 @@ StatusOr<std::unique_ptr<HloInstruction>> HloInstruction::CreateFromProto(
         instruction->AppendOperand(instruction_map.at(operand_id));
       }
       if (instruction->opcode() != HloOpcode::kFusion) {
-        if (instruction->opcode() == HloOpcode::kCall) {
+        if (instruction->opcode() == HloOpcode::kCall ||
+            instruction->opcode() == HloOpcode::kCustomCall) {
           TF_RET_CHECK(proto.called_computation_ids_size() == 1)
               << "Call should have 1 called computation but has "
               << proto.called_computation_ids_size();
@@ -1345,17 +1349,18 @@ bool HloInstruction::HasSideEffect() const {
 
 /* static */ std::unique_ptr<HloInstruction> HloInstruction::CreateCustomCall(
     const Shape& shape, absl::Span<HloInstruction* const> operands,
-    absl::string_view custom_call_target, string opaque) {
+    HloComputation* subcomputation, absl::string_view custom_call_target,
+    string opaque) {
   return absl::make_unique<HloCustomCallInstruction>(
-      shape, operands, custom_call_target, std::move(opaque));
+      shape, operands, subcomputation, custom_call_target, std::move(opaque));
 }
 
 /* static */ std::unique_ptr<HloInstruction> HloInstruction::CreateCustomCall(
     const Shape& shape, absl::Span<HloInstruction* const> operands,
-    absl::string_view custom_call_target,
+    HloComputation* subcomputation, absl::string_view custom_call_target,
     absl::Span<const Shape> operand_shapes_with_layout, string opaque) {
   return absl::make_unique<HloCustomCallInstruction>(
-      shape, operands, custom_call_target, std::move(opaque),
+      shape, operands, subcomputation, custom_call_target, std::move(opaque),
       operand_shapes_with_layout);
 }
 
@@ -2066,6 +2071,7 @@ Status HloInstruction::ReplaceAllUsesWithDifferentShape(
 HloComputation* HloInstruction::to_apply() const {
   switch (opcode_) {
     case HloOpcode::kCall:
+    case HloOpcode::kCustomCall:
     case HloOpcode::kMap:
     case HloOpcode::kReduceWindow:
     case HloOpcode::kReduce:
@@ -2086,6 +2092,7 @@ void HloInstruction::set_to_apply(HloComputation* computation) {
   CHECK(!IsFused());
   switch (opcode_) {
     case HloOpcode::kCall:
+    case HloOpcode::kCustomCall:
     case HloOpcode::kMap:
     case HloOpcode::kReduceWindow:
     case HloOpcode::kReduce:
@@ -2392,7 +2399,9 @@ std::vector<string> HloInstruction::ExtraAttributesToString(
                     }),
             "}"));
       }
-    } else if (opcode() == HloOpcode::kCall || opcode() == HloOpcode::kMap ||
+    } else if (opcode() == HloOpcode::kCall ||
+               opcode() == HloOpcode::kCustomCall ||
+               opcode() == HloOpcode::kMap ||
                opcode() == HloOpcode::kReduceWindow ||
                opcode() == HloOpcode::kReduce ||
                opcode() == HloOpcode::kAllReduce ||
@@ -2439,6 +2448,7 @@ std::vector<string> HloInstruction::ExtraAttributesToString(
         }
         break;
       case HloOpcode::kCall:
+      case HloOpcode::kCustomCall:
       case HloOpcode::kMap:
       case HloOpcode::kReduceWindow:
       case HloOpcode::kReduce:

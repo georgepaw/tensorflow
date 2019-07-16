@@ -222,7 +222,9 @@ StatusOr<std::unique_ptr<HloInstruction>> TryRewriteToCudnnForwardRelu(
     args.push_back(match.side_input);
   }
   auto new_conv = computation->AddInstruction(HloInstruction::CreateCustomCall(
-      conv->shape(), args, kCudnnConvBiasActivationForwardCallTarget));
+      conv->shape(), args,
+      CreateZeroComputationInModule(conv->GetModule(), conv->shape()),
+      kCudnnConvBiasActivationForwardCallTarget));
   new_conv->set_window(conv->window());
   new_conv->set_convolution_dimension_numbers(
       conv->convolution_dimension_numbers());

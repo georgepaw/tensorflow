@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/literal_util.h"
 #include "tensorflow/compiler/xla/service/dfs_hlo_visitor_with_default.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 
 namespace xla {
 namespace gpu {
@@ -82,7 +83,10 @@ Status Visitor::HandleBatchNormInference(HloInstruction* batch_norm) {
   operands.push_back(feature_index);
 
   std::unique_ptr<HloInstruction> libcall = HloInstruction::CreateCustomCall(
-      batch_norm->shape(), operands, kCudnnBatchNormForwardInferenceCallTarget);
+      batch_norm->shape(), operands,
+      CreateZeroComputationInModule(batch_norm->GetModule(),
+                                    batch_norm->shape()),
+      kCudnnBatchNormForwardInferenceCallTarget);
   TF_RETURN_IF_ERROR(
       computation_->ReplaceWithNewInstruction(batch_norm, std::move(libcall)));
   changed_ = true;
@@ -120,6 +124,8 @@ Status Visitor::HandleBatchNormTraining(HloInstruction* batch_norm) {
   HloInstruction* libcall =
       computation_->AddInstruction(HloInstruction::CreateCustomCall(
           batch_norm->shape(), operands,
+          CreateZeroComputationInModule(batch_norm->GetModule(),
+                                        batch_norm->shape()),
           kCudnnBatchNormForwardTrainingCallTarget));
 
   // The cudnn libcall returns a tuple
@@ -200,7 +206,10 @@ Status Visitor::HandleBatchNormGrad(HloInstruction* batch_norm) {
   operands.push_back(feature_index);
 
   std::unique_ptr<HloInstruction> libcall = HloInstruction::CreateCustomCall(
-      batch_norm->shape(), operands, kCudnnBatchNormBackwardCallTarget);
+      batch_norm->shape(), operands,
+      CreateZeroComputationInModule(batch_norm->GetModule(),
+                                    batch_norm->shape()),
+      kCudnnBatchNormBackwardCallTarget);
 
   TF_RETURN_IF_ERROR(
       computation_->ReplaceWithNewInstruction(batch_norm, std::move(libcall)));

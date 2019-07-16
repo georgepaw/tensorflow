@@ -35,12 +35,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16ForwardConvInputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[10,20,30,40] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[10,20,30,40], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     input = f16[10,20,30,41] parameter(0)
     filter = f16[2,2,41,40] parameter(1)
     ROOT result = (f16[10,20,30,40], u8[0]) custom-call(input, filter),
                   window={size=2x2}, dim_labels=b01f_01io->b01f,
-                  custom_call_target="__cudnn$convForward"
+                  custom_call_target="__cudnn$convForward",
+                  to_apply=ZeroComputation
   })")
                     .ValueOrDie();
   EXPECT_TRUE(CudnnConvPadForTensorCores().Run(module.get()).ValueOrDie());
@@ -60,12 +69,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16BackwardInputConvOutputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[10,20,30,40] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[10,20,30,40], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     output = f16[10,20,30,41] parameter(0)
     filter = f16[2,2,40,41] parameter(1)
     ROOT result = (f16[10,20,30,40], u8[0]) custom-call(output, filter),
                   window={size=2x2}, dim_labels=b01f_01io->b01f,
-                  custom_call_target="__cudnn$convBackwardInput"
+                  custom_call_target="__cudnn$convBackwardInput",
+                  to_apply=ZeroComputation
   })")
                     .ValueOrDie();
   EXPECT_TRUE(CudnnConvPadForTensorCores().Run(module.get()).ValueOrDie());
@@ -83,12 +101,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16ForwardConvOutputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[10,20,30,41] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[10,20,30,41], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     input = f16[10,20,30,40] parameter(0)
     filter = f16[2,2,40,41] parameter(1)
     ROOT result = (f16[10,20,30,41], u8[0]) custom-call(input, filter),
                   window={size=2x2}, dim_labels=b01f_01io->b01f,
-                  custom_call_target="__cudnn$convForward"
+                  custom_call_target="__cudnn$convForward",
+                  to_apply=ZeroComputation
   })")
                     .ValueOrDie();
   EXPECT_TRUE(CudnnConvPadForTensorCores().Run(module.get()).ValueOrDie());
@@ -103,12 +130,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16BackwardInputConvInputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[10,20,30,41] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[10,20,30,41], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     output = f16[10,20,30,40] parameter(0)
     filter = f16[2,2,41,40] parameter(1)
     result = (f16[10,20,30,41], u8[0]) custom-call(output, filter),
               window={size=2x2}, dim_labels=b01f_01io->b01f,
-              custom_call_target="__cudnn$convBackwardInput"
+              custom_call_target="__cudnn$convBackwardInput",
+              to_apply=ZeroComputation
     ROOT gte = f16[10,20,30,41] get-tuple-element(result), index=0
   })")
                     .ValueOrDie();
@@ -125,12 +161,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16BackwardFilterConvInputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[2,2,41,40] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[2,2,41,40], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     input = f16[10,20,30,41] parameter(0)
     output = f16[10,20,30,40] parameter(1)
     result = (f16[2,2,41,40], u8[0]) custom-call(input, output),
               window={size=2x2}, dim_labels=b01f_01io->b01f,
-              custom_call_target="__cudnn$convBackwardFilter"
+              custom_call_target="__cudnn$convBackwardFilter",
+              to_apply=ZeroComputation
     ROOT gte = f16[2,2,41,40] get-tuple-element(result), index=0
   })")
                     .ValueOrDie();
@@ -147,12 +192,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadF16BackwardFilterConvOutputChannels) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[2,2,40,41] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[2,2,40,41], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     input = f16[10,20,30,40] parameter(0)
     output = f16[10,20,30,41] parameter(1)
     result = (f16[2,2,40,41], u8[0]) custom-call(input, output),
               window={size=2x2}, dim_labels=b01f_01io->b01f,
-              custom_call_target="__cudnn$convBackwardFilter"
+              custom_call_target="__cudnn$convBackwardFilter",
+              to_apply=ZeroComputation
     ROOT gte = f16[2,2,40,41] get-tuple-element(result), index=0
   })")
                     .ValueOrDie();
@@ -169,12 +223,21 @@ TEST_F(CudnnConvPadForTensorCoresTest, PadInputFeatures3To4) {
   auto module = ParseAndReturnVerifiedModule(R"(
   HloModule TestModule
 
+  ZeroComputation {
+    c1 = f16[] constant(0)
+    c2 = u8[] constant(0)
+    b1 = f16[10,20,30,32] broadcast(c1), dimensions={}
+    b2 = u8[0] broadcast(c2), dimensions={}
+    ROOT tuple = (f16[10,20,30,32], u8[0]) tuple(b1, b2)
+  }
+
   ENTRY TestComputation {
     input = f16[10,20,30,3] parameter(0)
     filter = f16[2,2,3,32] parameter(1)
     ROOT result = (f16[10,20,30,32], u8[0]) custom-call(input, filter),
                   window={size=2x2}, dim_labels=b01f_01io->b01f,
-                  custom_call_target="__cudnn$convForward"
+                  custom_call_target="__cudnn$convForward",
+                  to_apply=ZeroComputation
   })")
                     .ValueOrDie();
   EXPECT_TRUE(CudnnConvPadForTensorCores().Run(module.get()).ValueOrDie());

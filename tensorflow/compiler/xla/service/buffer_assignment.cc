@@ -172,6 +172,7 @@ Status GatherComputationsByAllocationType(
            instruction->called_computations()) {
         switch (instruction->opcode()) {
           case HloOpcode::kCall:
+          case HloOpcode::kCustomCall:
           case HloOpcode::kConditional:
           case HloOpcode::kWhile:
             // Call and while must be called from a computation with global

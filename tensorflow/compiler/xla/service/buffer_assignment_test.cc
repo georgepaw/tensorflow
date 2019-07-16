@@ -30,6 +30,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/dfs_hlo_visitor_with_default.h"
 #include "tensorflow/compiler/xla/service/flatten_call_graph.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "tensorflow/compiler/xla/service/hlo_creation_utils.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_memory_scheduler.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
@@ -1351,11 +1352,16 @@ TEST_F(BufferAssignmentTest, TupleConstantAsOutput) {
 TEST_F(BufferAssignmentTest, TupleCustomCallAsOutput) {
   // Test a computation which returns a tuple custom call value.
   auto builder = HloComputation::Builder(TestName());
-  auto custom_call = builder.AddInstruction(HloInstruction::CreateCustomCall(
+
+  auto custom_call_shape =
       ShapeUtil::MakeTupleShape({ShapeUtil::MakeShape(PRED, {1, 2, 3, 4}),
-                                 ShapeUtil::MakeShape(S32, {101})}),
-      /*operands=*/{}, /*custom_call_target=*/"foo_function"));
+                                 ShapeUtil::MakeShape(S32, {101})});
   auto module = CreateNewVerifiedModule();
+  auto custom_call = builder.AddInstruction(HloInstruction::CreateCustomCall(
+      custom_call_shape, /*operands=*/{},
+      /*subcomputation*/
+      CreateZeroComputationInModule(module.get(), custom_call_shape),
+      /*custom_call_target=*/"foo_function"));
   module->AddEntryComputation(builder.Build());
   auto assignment = RunBufferAssignment(module.get());
 
@@ -2285,6 +2291,14 @@ TEST_F(BufferAssignmentTest, CallParamCoAllocation) {
   const char* hlo_text = R"(
 HloModule CallParamCoAllocation
 
+ZeroComputation {
+  c1 = f32[] constant(0)
+  c2 = f32[] constant(0)
+  b1 = f32[200] broadcast(c2), dimensions={}
+  b2 = f32[300] broadcast(c2), dimensions={}
+  ROOT tuple = (f32[200], f32[300]) tuple(b1, b2)
+}
+
 Callee {
   param0 = (f32[100],(f32[200],f32[300])) parameter(0)
   param1 = s32[20] parameter(1)
@@ -2294,7 +2308,8 @@ Callee {
 ENTRY Main {
   entry_param0 = f32[100] parameter(0)
   entry_param1 = s32[20]  parameter(1)
-  custom_call = (f32[200],f32[300]) custom-call(), custom_call_target="call-target"
+  custom_call = (f32[200],f32[300]) custom-call(), custom_call_target="call-target",
+    to_apply=ZeroComputation
   call_op0 = (f32[100],(f32[200],f32[300])) tuple(entry_param0, custom_call)
   ROOT call_result = f32[] call(call_op0, entry_param1), to_apply=Callee
 }

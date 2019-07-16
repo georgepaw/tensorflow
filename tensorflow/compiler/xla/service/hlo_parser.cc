@@ -1533,6 +1533,9 @@ bool HloParser::ParseInstructionRhs(HloComputation::Builder* builder,
       optional<int64> batch_group_count;
       optional<std::vector<Shape>> operand_layout_constraints;
       optional<bool> custom_call_has_side_effect;
+      optional<HloComputation*> to_apply;
+      attrs["to_apply"] = {/*required=*/true, AttrTy::kHloComputation,
+                           &to_apply};
       attrs["custom_call_target"] = {/*required=*/true, AttrTy::kString,
                                      &custom_call_target};
       attrs["window"] = {/*required=*/false, AttrTy::kWindow, &window};
@@ -1583,11 +1586,12 @@ bool HloParser::ParseInstructionRhs(HloComputation::Builder* builder,
           }
         }
         instruction = builder->AddInstruction(HloInstruction::CreateCustomCall(
-            shape, operands, *custom_call_target, *operand_layout_constraints,
+            shape, operands, *to_apply, *custom_call_target,
+            *operand_layout_constraints,
             backend_config ? *backend_config : ""));
       } else {
         instruction = builder->AddInstruction(HloInstruction::CreateCustomCall(
-            shape, operands, *custom_call_target,
+            shape, operands, *to_apply, *custom_call_target,
             backend_config ? *backend_config : ""));
       }
       auto custom_call_instr = Cast<HloCustomCallInstruction>(instruction);
