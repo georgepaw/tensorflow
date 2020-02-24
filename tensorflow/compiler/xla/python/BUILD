@@ -338,6 +338,7 @@ pybind_extension(
         "//third_party/py/numpy:headers",
         "@pybind11",
         "//third_party/python_runtime:headers",  # buildcleaner: keep
+        "//tensorflow/compiler/plugin",
         "//tensorflow/compiler/xla:literal",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:status",
